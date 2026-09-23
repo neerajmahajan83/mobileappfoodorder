@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.AddressEntity
 import com.example.data.local.MealSubscriptionEntity
 import com.example.data.local.MenuItemEntity
 import com.example.ui.theme.CoralPrimary
@@ -40,6 +42,7 @@ fun CartSheet(
     isLateExpress: Boolean,
     deliveryDeskNote: String,
     activePass: MealSubscriptionEntity?,
+    savedAddresses: List<AddressEntity> = emptyList(),
     onUpdateDeskNote: (String) -> Unit,
     onAddToCart: (MenuItemEntity) -> Unit,
     onRemoveFromCart: (MenuItemEntity) -> Unit,
@@ -106,7 +109,7 @@ fun CartSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 180.dp)
+                    .heightIn(max = 160.dp)
             ) {
                 items(cartItems.values.toList()) { cartItem ->
                     Row(
@@ -154,6 +157,30 @@ fun CartSheet(
             Spacer(modifier = Modifier.height(10.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(10.dp))
+
+            // Address quick chips
+            if (savedAddresses.isNotEmpty()) {
+                Text(
+                    text = "Select Saved Drop-off Location",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(savedAddresses) { addr ->
+                        FilterChip(
+                            selected = deliveryDeskNote.contains(addr.floorDesk),
+                            onClick = {
+                                onUpdateDeskNote("${addr.addressLine} - ${addr.floorDesk}")
+                            },
+                            label = { Text("${addr.label}: ${addr.floorDesk}", fontSize = 11.sp) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // Delivery Desk Drop-off instruction
             OutlinedTextField(

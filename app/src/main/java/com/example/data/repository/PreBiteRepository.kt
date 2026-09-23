@@ -1,10 +1,12 @@
 package com.example.data.repository
 
+import com.example.data.local.AddressEntity
 import com.example.data.local.MenuItemEntity
 import com.example.data.local.MealSubscriptionEntity
 import com.example.data.local.OrderEntity
 import com.example.data.local.PreBiteDao
 import com.example.data.local.SupportTicketEntity
+import com.example.data.local.UserEntity
 import kotlinx.coroutines.flow.Flow
 
 class PreBiteRepository(private val dao: PreBiteDao) {
@@ -14,6 +16,60 @@ class PreBiteRepository(private val dao: PreBiteDao) {
     val allTickets: Flow<List<SupportTicketEntity>> = dao.getAllTickets()
     val activeSubscription: Flow<MealSubscriptionEntity?> = dao.getActiveSubscription()
 
+    // --- User & Auth ---
+    fun getUserByEmail(email: String): Flow<UserEntity?> {
+        return dao.getUserByEmail(email)
+    }
+
+    suspend fun getUserByEmailSync(email: String): UserEntity? {
+        return dao.getUserByEmailSync(email)
+    }
+
+    suspend fun registerUser(user: UserEntity): Long {
+        return dao.insertUser(user)
+    }
+
+    suspend fun updateUser(user: UserEntity) {
+        dao.updateUser(user)
+    }
+
+    suspend fun updatePassword(email: String, newPassword: String) {
+        dao.updatePassword(email, newPassword)
+    }
+
+    suspend fun addWalletCredit(email: String, amount: Double) {
+        dao.addWalletCredit(email, amount)
+    }
+
+    // --- Addresses ---
+    fun getAddressesForUser(email: String): Flow<List<AddressEntity>> {
+        return dao.getAddressesForUser(email)
+    }
+
+    suspend fun addAddress(address: AddressEntity): Long {
+        if (address.isDefault) {
+            dao.clearDefaultAddresses(address.userEmail)
+        }
+        return dao.insertAddress(address)
+    }
+
+    suspend fun updateAddress(address: AddressEntity) {
+        if (address.isDefault) {
+            dao.clearDefaultAddresses(address.userEmail)
+        }
+        dao.updateAddress(address)
+    }
+
+    suspend fun deleteAddress(id: Long) {
+        dao.deleteAddress(id)
+    }
+
+    suspend fun setDefaultAddress(id: Long, userEmail: String) {
+        dao.clearDefaultAddresses(userEmail)
+        dao.setDefaultAddress(id)
+    }
+
+    // --- Menu & Orders ---
     fun getMenuItemsByMeal(mealType: String): Flow<List<MenuItemEntity>> {
         return dao.getMenuItemsByMeal(mealType)
     }
@@ -34,8 +90,16 @@ class PreBiteRepository(private val dao: PreBiteDao) {
         dao.updateOrderStatus(orderId, status)
     }
 
+    suspend fun updateOrderPaymentStatus(orderId: String, paymentStatus: String) {
+        dao.updateOrderPaymentStatus(orderId, paymentStatus)
+    }
+
     suspend fun updateRouteProgress(orderId: String, progress: Float) {
         dao.updateRouteProgress(orderId, progress)
+    }
+
+    suspend fun deleteOrder(orderId: String) {
+        dao.deleteOrder(orderId)
     }
 
     suspend fun insertTicket(ticket: SupportTicketEntity) {
@@ -44,10 +108,19 @@ class PreBiteRepository(private val dao: PreBiteDao) {
 
     suspend fun resolveTicket(ticketId: String, status: String, adminResponse: String, credit: Double) {
         dao.resolveTicket(ticketId, status, adminResponse, credit)
+        // Also credit user's wallet if credit > 0
+        if (credit > 0) {
+            // Find order or ticket to credit user
+            dao.addWalletCredit("alex@techcorp.com", credit)
+        }
     }
 
     suspend fun addMenuItem(item: MenuItemEntity): Long {
         return dao.insertMenuItem(item)
+    }
+
+    suspend fun updateMenuItem(item: MenuItemEntity) {
+        dao.updateMenuItem(item)
     }
 
     suspend fun updateItemAvailability(id: Long, isAvailable: Boolean) {
@@ -67,6 +140,54 @@ class PreBiteRepository(private val dao: PreBiteDao) {
     }
 
     suspend fun seedInitialDataIfEmpty() {
+        // 1. Seed Users if empty
+        if (dao.getUserCount() == 0) {
+            val customer = UserEntity(
+                email = "alex@techcorp.com",
+                passwordHash = "user123",
+                fullName = "Alex Chen",
+                phone = "+1 (555) 392-1084",
+                role = "CUSTOMER",
+                companyName = "TechCorp HQ",
+                dietaryPreference = "High Protein & Keto",
+                walletBalance = 25.00
+            )
+            val admin = UserEntity(
+                email = "admin@prebite.com",
+                passwordHash = "admin123",
+                fullName = "Kitchen Operations Admin",
+                phone = "+1 (800) 555-0199",
+                role = "ADMIN",
+                companyName = "PreBite Cloud Kitchens Hub",
+                dietaryPreference = "All Cuisines",
+                walletBalance = 150.00
+            )
+            dao.insertUser(customer)
+            dao.insertUser(admin)
+
+            // Seed default addresses for customer
+            dao.insertAddress(
+                AddressEntity(
+                    userEmail = "alex@techcorp.com",
+                    label = "Work / Office",
+                    addressLine = "Tech Park Tower B, Suite 402",
+                    floorDesk = "4th Floor Pantry, Desk 412",
+                    deliveryNotes = "Drop in PreBite designated insulated batch shelf",
+                    isDefault = true
+                )
+            )
+            dao.insertAddress(
+                AddressEntity(
+                    userEmail = "alex@techcorp.com",
+                    label = "Home",
+                    addressLine = "840 Grand Avenue, Apt 6B",
+                    floorDesk = "Building Concierge / Buzzer 0602",
+                    deliveryNotes = "Leave with doorman if not home",
+                    isDefault = false
+                )
+            )
+        }
+
         if (dao.getMenuItemCount() > 0) return
 
         val initialMenu = listOf(
@@ -263,11 +384,15 @@ class PreBiteRepository(private val dao: PreBiteDao) {
         // Seed an Active Order in delivery progress
         val activeOrder = OrderEntity(
             orderId = "PB-88421",
+            customerEmail = "alex@techcorp.com",
+            customerName = "Alex Chen",
+            orderSource = "APP",
             createdAt = System.currentTimeMillis() - 25 * 60 * 1000,
             mealType = "LUNCH",
             targetDate = "Today",
             deliveryTimeWindow = "12:00 PM - 12:45 PM",
             status = "OUT_FOR_DELIVERY",
+            paymentStatus = "PAID",
             itemsSummary = "1x Grilled Citrus Salmon Quinoa Bowl, 1x Berry Protein Overnight Oats",
             subtotal = 23.00,
             deliveryFee = 0.0, // Free with Pass
@@ -287,14 +412,18 @@ class PreBiteRepository(private val dao: PreBiteDao) {
         )
         dao.insertOrder(activeOrder)
 
-        // Seed a Completed past Breakfast order
+        // Seed a Completed past Breakfast order placed from the Web Portal
         val pastOrder = OrderEntity(
             orderId = "PB-87390",
+            customerEmail = "alex@techcorp.com",
+            customerName = "Alex Chen",
+            orderSource = "WEB",
             createdAt = System.currentTimeMillis() - 26 * 3600 * 1000,
             mealType = "BREAKFAST",
             targetDate = "Yesterday",
             deliveryTimeWindow = "7:30 AM - 8:15 AM",
             status = "DELIVERED",
+            paymentStatus = "PAID",
             itemsSummary = "2x Masala Egg & Cheese Multigrain Wrap",
             subtotal = 15.80,
             deliveryFee = 1.99,
@@ -314,10 +443,42 @@ class PreBiteRepository(private val dao: PreBiteDao) {
         )
         dao.insertOrder(pastOrder)
 
+        // Seed a pending verification Web order to showcase payment status processing in admin
+        val pendingWebOrder = OrderEntity(
+            orderId = "PB-89104",
+            customerEmail = "kiddiekingdom.019@gmail.com",
+            customerName = "Kiddie Kingdom Ops",
+            orderSource = "WEB",
+            createdAt = System.currentTimeMillis() - 10 * 60 * 1000,
+            mealType = "LUNCH",
+            targetDate = "Today",
+            deliveryTimeWindow = "12:00 PM - 12:45 PM",
+            status = "CONFIRMED",
+            paymentStatus = "PENDING_VERIFICATION",
+            itemsSummary = "2x Paneer Tikka Power Bento, 1x Falafel Platter",
+            subtotal = 37.60,
+            deliveryFee = 1.99,
+            lateFee = 0.0,
+            discount = 0.0,
+            totalAmount = 39.59,
+            isLateOrder = false,
+            deliveryAddress = "Innovation Hub, Floor 2",
+            deliveryDesk = "Deliver to Desk 208, West Wing",
+            paymentMethod = "Razorpay UPI (Pending)",
+            driverName = "Marcus Vance",
+            driverPhone = "+1 (555) 782-9011",
+            driverVehicle = "Eco-Electric Van #12",
+            batchStopNumber = 1,
+            totalBatchStops = 7,
+            routeProgress = 0.15f
+        )
+        dao.insertOrder(pendingWebOrder)
+
         // Seed a sample Support Ticket
         val sampleTicket = SupportTicketEntity(
             ticketId = "TKT-1042",
             orderId = "PB-87390",
+            customerEmail = "alex@techcorp.com",
             issueType = "PACKAGING",
             subject = "Paper bag seal was slightly opened",
             description = "The food was warm and fine, but the hygiene paper sticker was torn on delivery.",
@@ -332,6 +493,7 @@ class PreBiteRepository(private val dao: PreBiteDao) {
         // Seed Active Meal Pass
         val activePass = MealSubscriptionEntity(
             planName = "Weekly Routine Pass",
+            userEmail = "alex@techcorp.com",
             remainingMeals = 8,
             totalMeals = 10,
             expiresDate = "Oct 04, 2026",

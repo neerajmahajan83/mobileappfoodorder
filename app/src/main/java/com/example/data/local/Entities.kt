@@ -3,6 +3,33 @@ package com.example.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Entity(tableName = "users")
+data class UserEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val email: String,
+    val passwordHash: String,
+    val fullName: String,
+    val phone: String,
+    val role: String = "CUSTOMER", // "CUSTOMER", "ADMIN"
+    val companyName: String = "TechCorp Inc.",
+    val dietaryPreference: String = "High Protein & Clean Eating",
+    val walletBalance: Double = 15.00,
+    val avatarColor: Long = 0xFFD84315
+)
+
+@Entity(tableName = "addresses")
+data class AddressEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val userEmail: String,
+    val label: String, // "Work / Office", "Home", "Branch Office"
+    val addressLine: String, // "100 Innovation Way, Building 4"
+    val floorDesk: String, // "4th Floor Pantry, Desk 412"
+    val deliveryNotes: String = "Leave on designated batch shelf",
+    val isDefault: Boolean = false
+)
+
 @Entity(tableName = "menu_items")
 data class MenuItemEntity(
     @PrimaryKey(autoGenerate = true)
@@ -25,11 +52,15 @@ data class MenuItemEntity(
 data class OrderEntity(
     @PrimaryKey
     val orderId: String,
+    val customerEmail: String = "alex@techcorp.com",
+    val customerName: String = "Alex Chen",
+    val orderSource: String = "APP", // "APP", "WEB"
     val createdAt: Long = System.currentTimeMillis(),
     val mealType: String, // "BREAKFAST", "LUNCH", "DINNER"
     val targetDate: String, // "Today", "Tomorrow"
     val deliveryTimeWindow: String, // e.g. "12:00 PM - 12:45 PM"
-    val status: String, // "CONFIRMED", "BATCHING_PREP", "OUT_FOR_DELIVERY", "DELIVERED"
+    val status: String, // "CONFIRMED", "BATCHING_PREP", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"
+    val paymentStatus: String = "PAID", // "PAID", "PENDING_VERIFICATION", "REFUNDED", "COD_PENDING"
     val itemsSummary: String, // e.g. "2x Grilled Salmon Bowl, 1x Green Smoothie"
     val subtotal: Double,
     val deliveryFee: Double,
@@ -53,6 +84,7 @@ data class SupportTicketEntity(
     @PrimaryKey
     val ticketId: String,
     val orderId: String,
+    val customerEmail: String = "alex@techcorp.com",
     val issueType: String, // "MISSING_ITEM", "LATE_DELIVERY", "PACKAGING", "TEMPERATURE", "OTHER"
     val subject: String,
     val description: String,
@@ -67,6 +99,7 @@ data class SupportTicketEntity(
 data class MealSubscriptionEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val userEmail: String = "alex@techcorp.com",
     val planName: String,
     val remainingMeals: Int,
     val totalMeals: Int,

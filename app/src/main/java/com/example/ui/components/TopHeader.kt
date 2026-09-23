@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.UserEntity
 import com.example.ui.theme.CoralPrimary
 import com.example.ui.theme.CoralSecondary
 import java.time.LocalTime
@@ -27,9 +29,12 @@ fun TopHeader(
     simulatedTime: LocalTime,
     isAdminMode: Boolean,
     cartItemCount: Int,
+    currentUser: UserEntity?,
     onToggleAdminMode: (Boolean) -> Unit,
     onSelectTimePreset: (String) -> Unit,
-    onCartClicked: () -> Unit
+    onCartClicked: () -> Unit,
+    onProfileClicked: () -> Unit,
+    onWebPortalClicked: () -> Unit
 ) {
     var showTimeMenu by remember { mutableStateOf(false) }
 
@@ -38,7 +43,7 @@ fun TopHeader(
         tonalElevation = 2.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -48,7 +53,7 @@ fun TopHeader(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(CoralPrimary),
                         contentAlignment = Alignment.Center
@@ -57,15 +62,15 @@ fun TopHeader(
                             imageVector = Icons.Default.Restaurant,
                             contentDescription = "PreBite Logo",
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "PreBite",
-                                style = MaterialTheme.typography.titleLarge.copy(
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = (-0.5).sp
                                 )
@@ -76,45 +81,45 @@ fun TopHeader(
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    text = if (isAdminMode) "KITCHEN" else "SCHEDULED",
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                    text = if (isAdminMode) "ADMIN" else "SCHEDULED",
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 9.sp
+                                        fontSize = 8.sp
                                     ),
                                     color = if (isAdminMode) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
                         Text(
-                            text = "Batch Dining • Cut-Off Precision",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Batch Dining • Cut-Off",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                // Actions: Mode switch, Time preset, Cart
+                // Actions: Mode switch, Time preset, Web View, Profile, Cart
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Time preset simulation dropdown
                     Box {
                         FilledTonalButton(
                             onClick = { showTimeMenu = true },
                             modifier = Modifier
-                                .height(34.dp)
+                                .height(32.dp)
                                 .testTag("time_sim_button"),
-                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Schedule,
                                 contentDescription = "Simulate Time",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = simulatedTime.format(DateTimeFormatter.ofPattern("h:mm a")),
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
 
@@ -161,24 +166,25 @@ fun TopHeader(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
-                    // Role switch button (Customer vs Kitchen Merchant)
+                    // Web Portal button
                     IconButton(
-                        onClick = { onToggleAdminMode(!isAdminMode) },
-                        modifier = Modifier.testTag("toggle_admin_button")
+                        onClick = onWebPortalClicked,
+                        modifier = Modifier.size(32.dp).testTag("web_portal_icon")
                     ) {
                         Icon(
-                            imageVector = if (isAdminMode) Icons.Default.Person else Icons.Default.Kitchen,
-                            contentDescription = if (isAdminMode) "Switch to Customer" else "Switch to Kitchen Admin",
-                            tint = if (isAdminMode) CoralSecondary else MaterialTheme.colorScheme.onSurface
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Web Portal Mode",
+                            tint = Color(0xFF1565C0),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
                     // Cart Icon with Badge
                     IconButton(
                         onClick = onCartClicked,
-                        modifier = Modifier.testTag("header_cart_button")
+                        modifier = Modifier.size(32.dp).testTag("header_cart_button")
                     ) {
                         BadgedBox(
                             badge = {
@@ -187,7 +193,8 @@ fun TopHeader(
                                         Text(
                                             text = "$cartItemCount",
                                             color = Color.White,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp
                                         )
                                     }
                                 }
@@ -195,9 +202,30 @@ fun TopHeader(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ShoppingBag,
-                                contentDescription = "Cart"
+                                contentDescription = "Cart",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // User Profile Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(if (currentUser?.role == "ADMIN") CoralSecondary else CoralPrimary)
+                            .clickable(onClick = onProfileClicked)
+                            .testTag("header_profile_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val initials = currentUser?.fullName?.split(" ")?.mapNotNull { it.firstOrNull()?.toString() }?.take(2)?.joinToString("") ?: "U"
+                        Text(
+                            text = initials,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        )
                     }
                 }
             }

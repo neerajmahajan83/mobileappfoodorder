@@ -2,6 +2,7 @@ package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -47,18 +48,34 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
     val isLateExpress = viewModel.isLateExpressActive
     val deskNote by viewModel.deliveryDeskNote.collectAsState()
     val orders by viewModel.allOrders.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val savedAddresses by viewModel.userAddresses.collectAsState()
 
     var showCartSheet by remember { mutableStateOf(false) }
-    var isAdminMode by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     val activeOrderCount = orders.count { it.status != "DELIVERED" && it.status != "CANCELLED" }
+    val pendingPaymentCount = orders.count { it.paymentStatus == "PENDING_VERIFICATION" }
     val cartCount = cartItems.values.sumOf { it.quantity }
+    val isAdmin = currentUser?.role == "ADMIN" || currentScreen == "admin"
 
-    // If admin mode is toggled, switch between customer screens and admin screen
-    val effectiveScreen = if (isAdminMode) "admin" else currentScreen
+    // Back handler to navigate back to Home if in another screen
+    BackHandler(enabled = currentScreen != "home" && currentScreen != "login") {
+        viewModel.setScreen("home")
+    }
+
+    if (!isLoggedIn || currentScreen == "login") {
+        AuthScreen(
+            viewModel = viewModel,
+            onAuthSuccess = {
+                // Screen is handled in viewModel.login/register
+            }
+        )
+        return
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -66,14 +83,16 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
         topBar = {
             TopHeader(
                 simulatedTime = simulatedTime,
-                isAdminMode = isAdminMode,
+                isAdminMode = isAdmin,
                 cartItemCount = cartCount,
+                currentUser = currentUser,
                 onToggleAdminMode = {
-                    isAdminMode = it
                     if (it) viewModel.setScreen("admin") else viewModel.setScreen("home")
                 },
                 onSelectTimePreset = { viewModel.setSimulatedPreset(it) },
-                onCartClicked = { showCartSheet = true }
+                onCartClicked = { showCartSheet = true },
+                onProfileClicked = { viewModel.setScreen("profile") },
+                onWebPortalClicked = { viewModel.setScreen("web_portal") }
             )
         },
         bottomBar = {
@@ -83,22 +102,16 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
                 tonalElevation = 6.dp
             ) {
                 NavigationBarItem(
-                    selected = effectiveScreen == "home",
-                    onClick = {
-                        isAdminMode = false
-                        viewModel.setScreen("home")
-                    },
+                    selected = currentScreen == "home",
+                    onClick = { viewModel.setScreen("home") },
                     icon = { Icon(Icons.Default.RestaurantMenu, contentDescription = "Menu") },
                     label = { Text("Menu") },
                     modifier = Modifier.testTag("nav_menu")
                 )
 
                 NavigationBarItem(
-                    selected = effectiveScreen == "tracking",
-                    onClick = {
-                        isAdminMode = false
-                        viewModel.setScreen("tracking")
-                    },
+                    selected = currentScreen == "tracking",
+                    onClick = { viewModel.setScreen("tracking") },
                     icon = {
                         BadgedBox(
                             badge = {
@@ -117,36 +130,39 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
                 )
 
                 NavigationBarItem(
-                    selected = effectiveScreen == "pass",
-                    onClick = {
-                        isAdminMode = false
-                        viewModel.setScreen("pass")
-                    },
-                    icon = { Icon(Icons.Default.CardMembership, contentDescription = "Pass") },
-                    label = { Text("Meal Pass") },
-                    modifier = Modifier.testTag("nav_pass")
+                    selected = currentScreen == "web_portal",
+                    onClick = { viewModel.setScreen("web_portal") },
+                    icon = { Icon(Icons.Default.Language, contentDescription = "Web Site") },
+                    label = { Text("Web Order") },
+                    modifier = Modifier.testTag("nav_web_portal")
                 )
 
                 NavigationBarItem(
-                    selected = effectiveScreen == "support",
-                    onClick = {
-                        isAdminMode = false
-                        viewModel.setScreen("support")
+                    selected = currentScreen == "admin",
+                    onClick = { viewModel.setScreen("admin") },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (pendingPaymentCount > 0) {
+                                    Badge(containerColor = CoralPrimary) {
+                                        Text("$pendingPaymentCount")
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Kitchen, contentDescription = "Admin")
+                        }
                     },
-                    icon = { Icon(Icons.Default.HeadsetMic, contentDescription = "Support") },
-                    label = { Text("Support") },
-                    modifier = Modifier.testTag("nav_support")
-                )
-
-                NavigationBarItem(
-                    selected = effectiveScreen == "admin",
-                    onClick = {
-                        isAdminMode = true
-                        viewModel.setScreen("admin")
-                    },
-                    icon = { Icon(Icons.Default.Kitchen, contentDescription = "Kitchen") },
-                    label = { Text("Kitchen") },
+                    label = { Text("Admin") },
                     modifier = Modifier.testTag("nav_kitchen")
+                )
+
+                NavigationBarItem(
+                    selected = currentScreen == "profile",
+                    onClick = { viewModel.setScreen("profile") },
+                    icon = { Icon(Icons.Default.AccountCircle, contentDescription = "Profile") },
+                    label = { Text("Profile") },
+                    modifier = Modifier.testTag("nav_profile")
                 )
             }
         }
@@ -156,7 +172,7 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (effectiveScreen) {
+            when (currentScreen) {
                 "home" -> DashboardScreen(
                     viewModel = viewModel,
                     onOpenCart = { showCartSheet = true }
@@ -171,6 +187,18 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
                     onNavigateToTracking = { viewModel.setScreen("tracking") }
                 )
                 "admin" -> AdminPanelScreen(viewModel = viewModel)
+                "profile" -> ProfileScreen(
+                    viewModel = viewModel,
+                    onLogout = { viewModel.setScreen("login") }
+                )
+                "web_portal" -> WebPortalView(
+                    viewModel = viewModel,
+                    onNavigateToAdmin = { viewModel.setScreen("admin") }
+                )
+                else -> DashboardScreen(
+                    viewModel = viewModel,
+                    onOpenCart = { showCartSheet = true }
+                )
             }
         }
 
@@ -187,6 +215,7 @@ fun PreBiteApp(viewModel: PreBiteViewModel) {
                 isLateExpress = isLateExpress,
                 deliveryDeskNote = deskNote,
                 activePass = activePass,
+                savedAddresses = savedAddresses,
                 onUpdateDeskNote = { viewModel.updateDeliveryDeskNote(it) },
                 onAddToCart = { viewModel.addToCart(it) },
                 onRemoveFromCart = { viewModel.removeFromCart(it) },
