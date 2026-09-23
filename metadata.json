@@ -1,0 +1,6 @@
+{
+  "name": "PreBite - Scheduled Meal Delivery",
+  "description": "Scheduled food delivery service with strict cut-off times, batched kitchen prep, route tracking, meal subscription passes, and merchant admin portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
